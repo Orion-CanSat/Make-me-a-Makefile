@@ -303,21 +303,78 @@ TARGET_DATA_LIST_F  := bin/`$(TARGET_NAME).lst
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Source Files & Library Files
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-RWildCard            = `$(wildcard `$1`$2) `$(foreach d,`$(wildcard `$1*),`$(call RWildCard,`$d/,`$2))
+RWildCardSRC         = `$(wildcard `$1`$2) `$(foreach d,`$(wildcard `$1*),`$(call RWildCardSRC,`$d/,`$2))
 
-SRC_C_FILES         := `$(call RWildCard,`$(SRC)/,*.c)
-SRC_CXX_FILES       := `$(call RWildCard,`$(SRC)/,*.cpp)
-SRC_S_FILES         := `$(call RWildCard,`$(SRC)/,*.S)
+SRC_C_FILES         := `$(call RWildCardSRC,`$(SRC)/,*.c)
+SRC_CXX_FILES       := `$(call RWildCardSRC,`$(SRC)/,*.cpp)
+SRC_S_FILES         := `$(call RWildCardSRC,`$(SRC)/,*.S)
+SRC_OBJ             := `$(SRC_S_FILES:`$(SRC)/%.S=`$(SRC_BIN)/%.o) `$(SRC_C_FILES:`$(SRC)/%.c=`$(SRC_BIN)/%.o) `$(SRC_CXX_FILES:`$(SRC)/%.cpp=`$(SRC_BIN)/%.o)
+
+LIB_DIRS            := `$(foreach d, `$(LIBS), `$(LIBS_DIR)/`$d/ `$(LIBS_DIR)/`$d/utility `$(LIBS_DIR)/`$d/src/ `$(dir `$(call rwildcard,`$(LIBS_DIR)/`$d/src/,*/.)) `$(LIBS_DIR)/`$d/`$(MCU))
+LIB_C_FILES         := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.c))
+LIB_CXX_FILES       := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.cpp))
+LIB_S_FILES         := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.S))
+LIB_OBJ             := `$(LIB_C_FILES:`$(LIBS_DIR)/%.c=`$(LIB_BIN)/%.o) `$(LIB_CXX_FILES:`$(LIBS_DIR)/%.cpp=`$(LIB_BIN)/%.o) `$(LIB_S_FILES:`$(LIBS_DIR)/%.S=`$(LIB_BIN)/%.o)
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Includes
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+INCLUDE             := -I./`$(SRC) -Iinclude
+INCLUDE             += `$(foreach d, `$(LIB_DIRS), -I`$d)
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Creation of Directories
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+DIRECTORIES         := `$(sort `$(dir `$(SRC_OBJ) `$(LIB_OBJ)))
+GENDIRECTORIES      := `$(foreach d, `$(DIRECTORIES), `$(shell if not exist `"`$d`" mkdir `"`$d`"))
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Targets
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-all:
-`t@echo `$(FLAGS_COMPILER_LD)
-`t@echo `$(SRC_C_FILES)
-`t@echo `$(SRC_CXX_FILES)
-`t@echo `$(SRC_S_FILES)"
+.PHONY: all
+
+all: `$(TARGET_DATA_LIST_F) `$(OUTPUT_HEX)
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Source Targets
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+`$(SRC_BIN)/%.o: `$(SRC)/%.c
+`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+`$(SRC_BIN)/%.o: `$(SRC)/%.cpp
+`t@`"`$(CXX)`" `$(CXX_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+`$(SRC_BIN)/%.o: `$(SRC)/%.S
+`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Library Targets
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.c
+`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.cpp
+`t@`"`$(CXX)`" `$(CXX_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.S
+`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Linking Targets
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+`$(OUTPUT_ELF): `$(LIB_OBJ) `$(SRC_OBJ)
+`t@`$(CC) `$(LD_FLAGS) -o `"`$@`" `$(SRC_OBJ) `$(LIB_OBJ) `$(LIBS)
+
+%.lst: %.elf
+`t@`$(OBJDUMP) -d -S --demangle --no-show-raw-insn --syms `"`$<`" > `"`$@`"
+
+%.hex: %.elf
+`t@`$(OBJCOPY) -O ihex -R.eeprom `"`$<`" `"`$@`""
 
 Write-Progress -Id 1 -Activity Updating -Status 'Creating Makefile' -PercentComplete 75 -CurrentOperation OuterLoop
 
