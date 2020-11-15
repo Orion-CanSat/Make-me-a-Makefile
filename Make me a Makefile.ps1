@@ -141,7 +141,7 @@ switch ($BoardNumber)
         $CPUType = "cortex-m4"
         $CPUSpeed = "120000000"
         $FPU = "fpv4-sp-d16"
-        $Defines = "-D__MK64FX512__ -DTEENSYDUINO=153 -DARDUINO_TEENSY35 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH"
+        $Defines = "-D__MK64FX512__ -DTEENSYDUINO=153 -DARDUINO_TEENSY35 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH -DARDUINO"
     }
     4 {
         $BoardName = 'Teensy 3.6'
@@ -150,7 +150,7 @@ switch ($BoardNumber)
         $CPUType = 'cortex-m4'
         $CPUSpeed = '256000000'
         $FPU = 'fpv4-sp-d16'
-        $Defines = "-D__MK66FX1M0__ -DTEENSYDUINO=153 -DARDUINO_TEENSY36 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH"
+        $Defines = "-D__MK66FX1M0__ -DTEENSYDUINO=153 -DARDUINO_TEENSY36 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH -DARDUINO"
     }
     5 {
         $BoardName = 'Teensy 4.0'
@@ -159,7 +159,7 @@ switch ($BoardNumber)
         $CPUType = 'cortex-m7'
         $CPUSpeed = '600000000'
         $FPU = 'fpv5-d16'
-        $Defines = "-D__IMXRT1062__ -DTEENSYDUINO=153 -DARDUINO_TEENSY40 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH"
+        $Defines = "-D__IMXRT1062__ -DTEENSYDUINO=153 -DARDUINO_TEENSY40 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH -DARDUINO"
     }
     6 {
         $BoardName = 'Teensy 4.1'
@@ -168,7 +168,7 @@ switch ($BoardNumber)
         $CPUType = 'cortex-m7'
         $CPUSpeed = '600000000'
         $FPU = 'fpv5-d16'
-        $Defines = "-D__IMXRT1062__ -DTEENSYDUINO=153 -DARDUINO_TEENSY41 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH"
+        $Defines = "-D__IMXRT1062__ -DTEENSYDUINO=153 -DARDUINO_TEENSY41 -DF_CPU=$CPUSpeed -DUSB_SERIAL -DLAYOUT_US_ENGLISH -DARDUINO"
     }
 }
 
@@ -214,13 +214,19 @@ if ($Defines -eq $null)
 
 Write-Progress -Id 1 -Activity Updating -Status 'Creating Makefile' -PercentComplete 30 -CurrentOperation OuterLoop
 
-$Optimization = Read-Host -Prompt "What is the level of optimazation that the commpiler will output? "
+$Optimization = ""
+While (-Not ((Is-Numeric($Optimization) -and ($Optimization -gt '0') -and ($Optimization -lt '3'))-or ($Optimization -eq 's')))
+{
+    Write-Host "What is the level of optimazation that the commpiler will output?`n0: No optimization (the default); generates unoptimized code but has the fastest compilation time.`n1: Moderate optimization; optimizes reasonably well but does not degrade compilation time significantly.`n2: Full optimization; generates highly optimized code and has the slowest compilation time.`n3: Full optimization as in 2; also uses more aggressive automatic inlining of subprograms within a unit (Inlining of Subprograms) and attempts to vectorize loops.`ns: Optimize space usage (code and data) of resulting program."
+    $Optimization = Read-Host
+}
+$Optimization = '-O' + $Optimization
 
 Write-Progress -Id 1 -Activity Updating -Status 'Creating Makefile' -PercentComplete 40 -CurrentOperation OuterLoop
 
 $LibraryDir = Read-Host -Prompt "Where are your libraries located in? "
 $Libraries = (Get-ChildItem -Path $LibraryDir -Directory)
-
+$CoreLibraryDir = Read-Host -Prompt "Where do you have a core library? (If you do not have a core library leave empty) "
 $Date = Get-Date -UFormat "%Y/%m/%d %R"
 
 Write-Progress -Id 1 -Activity Updating -Status 'Creating Makefile' -PercentComplete 50 -CurrentOperation OuterLoop
@@ -234,14 +240,43 @@ $OutputString = "#--------------------------------------------------------------
 # Time of creation: $Date
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 
+#MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMMMMMWNX0OOkkxk0KXNWWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMWXOdlc;'.';;..;lodxO0XWWMMMMMMMMMWNXKKXNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMWNOl,...,'..':c::llllllclox0NMWNKOxollccc:l0MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMWXk:..........',cllllllllcc:,;odolcloxMKXKOc,OMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMW0c.........',;cccllllllllll:,,:::x0kMMMMKo;;dNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMNk:........,::ccccclllllllllll:,,,:ddcxMNk::okNMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMXkc'..''..,:::cccccclllllllllllc,..,:;l0Oc:dXWWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMNkl:..:cc:;:ccccccccclllllllllloc;;;:c;clcdKWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMW0olc,',;:c:;:::cccccllllllllloddl;,,;;;:cdOOMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMNxlllc:,',clc:::ccccllllllllloddc,'''''';cldMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMXdclllll:;;;,',,;:ccllllllllloddc,'''',:clOWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMXdcllllllc:'......,;:cllllllllc;;:cc:;lxockMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMXXXXNWMMM
+#MMMMMMMMMNdclllllll;'.........,:clllc;'.,:ldxlcxkdlkMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMc::::lOWMM
+#MMMMMMMMMWkclooollc,'..........',,,'.';clooddodkkdlMMMMNNNNNNNNNWWMMMWNWWMMMWWNNNNWWMMMMWWWMMMMMMWNNMMMM:;;dNMM
+#MMMMMMMMMMKl:loooolc;''''''''''.....'coooooodxkOklxMMOddooooooodkXWMkoxKMWKkdoooodxONWMOdxKNMMMXkoxkM;;::MMMMMM
+#MMMMMMMMMWO:':loooool:;''','......';loooooodxkOkldXMNd::;:cccc::cxNMd:l0MMo:;:ccc::cxXMxcclxKWWKo:okM,;;;;:xNMM
+#MMMMMMMWOl:odc:looooool:,.....'',,;coooooodxkOxldXMMNd:ccoMMMxoc;oXMo;l0Mx::dXNNNOl;lKMx:;,;lxK0l;l0MOOOOOOKWMM
+#MMMMMWKl;o0WWKo::lool:,'...'',,;:cloooooodxkxolkNMMMXd;;,,,;;:;;:kWMo;c0Mx;:kWMMMKl;l0Md;:ll;;ldc;lKMMMMMMMMMMM
+#MMMMNx;cOWMMMMNk:,,''',;,',,;:cloooooddddxdlcdKWMMMMNo;;:oxc,,:oMMMMo,c0Mx;:xKXXXOl;cKMd;:kXOc,;:;lKMMMMMMMMMMM
+#MMMWx,oXMMWX0kdl:::,,;cl:,;cooddddddddolcclxKWMMMMMMXo,:lMMXx:,;lMMMl,:0MO:,;::::;,,dNMd,;kWMXx:,'cKMMMMMMMMMMM
+#MMMNo,oxxolccldkKNNXOdlc:,,:ccccccc:::clx0NWMMMMMMMMNkldkKMMWXxlldKMkldXMM0dllccclokNMMOloKMMMWKxldXMMMMMMMMMMM
+#MMMWKxdddxOKXWMMMMMMMMWX0kxdddoodddxOKNWMMMMMMMMMMMMMWWWWMMMMMWWWWWMWWWMMMMMWWWWWWWMMMMWWWWMMMMMWWWMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMWWMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+#MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+
+
 ifeq (`$(OS),Windows_NT)
-    SHELL           := cmd.exe
-    export SHELL
-    DateTime        := `$(shell powershell [int](Get-Date -UFormat +%s)[0])
+`tSHELL           := cmd.exe
+`texport SHELL
+`tDateTime        := `$(shell powershell [int](Get-Date -UFormat +%s)[0])
 else
-    SHELL           := bash
-    export SHELL
-    DateTime        := `$(shell date +%s)
+`tSHELL           := bash
+`texport SHELL
+`tDateTime        := `$(shell date +%s)
 endif
 
 TARGET_NAME         := $ProjectName
@@ -249,29 +284,48 @@ BOARD_ID            := $BoardID
 MCU                 := $BoardProcessor
 
 LIBS_DIR            := $LibraryDir
-LIBS                := $Libraries
+LIBS_NAMES          := $Libraries
+CORE_BASE           := $CoreLibraryDir
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Flags
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-
 FLAGS_CPU           := -mthumb -mcpu=$CPUType -mfloat-abi=hard -mfpu=$FPU -fsingle-precision-constant
-FLAGS_OPTIMAZATION  := $Optimization
-FLAGS_COMPILER      := -g -Wall -ffunction-sections -fdata-sections -nostdlib -MMD
+FLAGS_OPT           := $Optimization
+FLAGS_COM           := -g -Wall -ffunction-sections -fdata-sections -nostdlib -MMD
 FLAGS_LSP           := 
 
-FLAGS_COMPILER_C    := 
-FLAGS_COMPILER_CXX  := -fno-exceptions -fpermissive -felide-constructors -std=gnu++14 -Wno-error=narrowing -fno-rtti
-FLAGS_COMPILER_S    := -x assembler-with-cpp
-FLAGS_COMPILER_LD   := -Wl,--print-memory-usage,--gc-sections,--relax,--defsym=__rtc_localtime=`$(DateTime) -T$BoardProcessor.ld
+FLAGS_CPP           := -fno-exceptions -fpermissive -felide-constructors -std=gnu++14 -Wno-error=narrowing -fno-rtti
+FLAGS_C             := 
+FLAGS_S             := -x assembler-with-cpp
+FLAGS_LD            := -Wl,--print-memory-usage,--gc-sections,--relax,--defsym=__rtc_localtime=`$(shell powershell [int](Get-Date -UFormat +%s)[0]) -T`$(CORE_BASE)/$BoardProcessor.ld
 
+LIBS                := -larm_cortexM4lf_math -lm -lstdc++
 DEFINES             := $Defines
 
-C_FLAGS             := `$(FLAGS_CPU) `$(FLAGS_OPTIMAZATION) `$(FLAGS_COMPILER) `$(DEFINES) `$(FLAGS_COMPILER_C)
-CXX_FLAGS           := `$(FLAGS_CPU) `$(FLAGS_OPTIMAZATION) `$(FLAGS_COMPILER) `$(DEFINES) `$(FLAGS_COMPILER_CXX)
-S_FLAGS             := `$(FLAGS_CPU) `$(FLAGS_OPTIMAZATION) `$(FLAGS_COMPILER) `$(DEFINES) `$(FLAGS_COMPILER_S)
-LD_FLAGS            := `$(FLAGS_CPU) `$(FLAGS_OPTIMAZATION) `$(FLAGS_LSP) `$(FLAGS_COMPILER_LD)
+CPP_FLAGS           := `$(FLAGS_CPU) `$(FLAGS_OPT) `$(FLAGS_COM) `$(DEFINES) `$(FLAGS_CPP)
+C_FLAGS             := `$(FLAGS_CPU) `$(FLAGS_OPT) `$(FLAGS_COM) `$(DEFINES) `$(FLAGS_C)
+S_FLAGS             := `$(FLAGS_CPU) `$(FLAGS_OPT) `$(FLAGS_COM) `$(DEFINES) `$(FLAGS_S)
+LD_FLAGS            := `$(FLAGS_CPU) `$(FLAGS_OPT) `$(FLAGS_LSP) `$(FLAGS_LD)
+AR_FLAGS            := rcs
+
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Files & Folders
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+SRC_SRC             := src
+LIB_SRC             := `$(LIBS_DIR)
+CORE_SRC            := `$(CORE_BASE)
+
+BIN                 := bin
+SRC_BIN             := `$(BIN)/src
+CORE_BIN            := `$(BIN)/core
+LIB_BIN             := `$(BIN)/lib
+CORE_LIB            := `$(BIN)/core.a
+TARGET_HEX          := `$(BIN)/`$(TARGET_NAME).hex
+TARGET_ELF          := `$(BIN)/`$(TARGET_NAME).elf
+TARGET_LST          := `$(BIN)/`$(TARGET_NAME).lst
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
@@ -286,95 +340,140 @@ OBJDUMP             := arm-none-eabi-objdump
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-# Files & Folders
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-SRC                 := src
-LIBS_SRC            := `$(LIBS_DIR)
-
-BIN                 := bin
-SRC_BIN             := bin/src
-LIB_BIN             := bin/lib
-
-OUTPUT_HEX          := bin/`$(TARGET_NAME).hex
-OUTPUT_ELF          := bin/`$(TARGET_NAME).elf
-TARGET_DATA_LIST_F  := bin/`$(TARGET_NAME).lst
-
-
-#-------------------------------------------------------------------------------------------------------------------------------------------------
 # Source Files & Library Files
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-RWildCardSRC         = `$(wildcard `$1`$2) `$(foreach d,`$(wildcard `$1*),`$(call RWildCardSRC,`$d/,`$2))
+rwildcard           =`$(wildcard `$1`$2) `$(foreach d,`$(wildcard `$1*),`$(call rwildcard,`$d/,`$2))
 
-SRC_C_FILES         := `$(call RWildCardSRC,`$(SRC)/,*.c)
-SRC_CXX_FILES       := `$(call RWildCardSRC,`$(SRC)/,*.cpp)
-SRC_S_FILES         := `$(call RWildCardSRC,`$(SRC)/,*.S)
-SRC_OBJ             := `$(SRC_S_FILES:`$(SRC)/%.S=`$(SRC_BIN)/%.o) `$(SRC_C_FILES:`$(SRC)/%.c=`$(SRC_BIN)/%.o) `$(SRC_CXX_FILES:`$(SRC)/%.cpp=`$(SRC_BIN)/%.o)
+SRC_C_FILES         := `$(call rwildcard,`$(SRC_SRC)/,*.c)
+SRC_CPP_FILES       := `$(call rwildcard,`$(SRC_SRC)/,*.cpp)
+SRC_S_FILES         := `$(call rwildcard,`$(SRC_SRC)/,*.S)
+SRC_OBJ             := `$(SRC_S_FILES:`$(SRC_SRC)/%.S=`$(SRC_BIN)/%.o) `$(SRC_C_FILES:`$(SRC_SRC)/%.c=`$(SRC_BIN)/%.o) `$(SRC_CPP_FILES:`$(SRC_SRC)/%.cpp=`$(SRC_BIN)/%.o)
 
-LIB_DIRS            := `$(foreach d, `$(LIBS), `$(LIBS_DIR)/`$d/ `$(LIBS_DIR)/`$d/utility `$(LIBS_DIR)/`$d/src/ `$(dir `$(call rwildcard,`$(LIBS_DIR)/`$d/src/,*/.)) `$(LIBS_DIR)/`$d/`$(MCU))
-LIB_C_FILES         := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.c))
-LIB_CXX_FILES       := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.cpp))
-LIB_S_FILES         := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.S))
-LIB_OBJ             := `$(LIB_C_FILES:`$(LIBS_DIR)/%.c=`$(LIB_BIN)/%.o) `$(LIB_CXX_FILES:`$(LIBS_DIR)/%.cpp=`$(LIB_BIN)/%.o) `$(LIB_S_FILES:`$(LIBS_DIR)/%.S=`$(LIB_BIN)/%.o)
+CORE_CPP_FILES      := `$(call rwildcard,`$(CORE_SRC)/,*.cpp)
+CORE_C_FILES        := `$(call rwildcard,`$(CORE_SRC)/,*.c)
+CORE_S_FILES        := `$(call rwildcard,`$(CORE_SRC)/,*.S)
+CORE_OBJ            := `$(CORE_S_FILES:`$(CORE_SRC)/%.S=`$(CORE_BIN)/%.o) `$(CORE_C_FILES:`$(CORE_SRC)/%.c=`$(CORE_BIN)/%.o) `$(CORE_CPP_FILES:`$(CORE_SRC)/%.cpp=`$(CORE_BIN)/%.o)
+
+LIB_DIRS            := `$(foreach d, `$(LIBS_NAMES), `$(LIBS_DIR)/`$d/ `$(LIBS_DIR)/`$d/utility/ )    # base and /utility
+LIB_DIRS            += `$(foreach d, `$(LIBS_NAMES), `$(LIBS_DIR)/`$d/src/ `$(dir `$(call rwildcard,`$(LIBS_DIR)/`$d/src/,*/.)))
+
+LIB_CPP_LOCAL       := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.cpp))
+LIB_C_LOCAL         := `$(foreach d, `$(LIB_DIRS_),`$(call wildcard,`$d/*.c))
+LIB_S_LOCAL         := `$(foreach d, `$(LIB_DIRS),`$(call wildcard,`$d/*.S))
+
+LIB_OBJ             := `$(LIB_CPP_LOCAL:`$(LIBS_DIR)/%.cpp=`$(LIB_BIN)/%.o)
+LIB_OBJ             += `$(LIB_C_LOCAL:`$(LIBS_DIR)/%.c=`$(LIB_BIN)/%.o)
+LIB_OBJ             += `$(LIB_S_LOCAL:`$(LIBS_DIR)/%.S=`$(LIB_BIN)/%.o)
+
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Includes
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-INCLUDE             := -I./`$(SRC) -Iinclude
+INCLUDE             := -I./`$(SRC_SRC) -I`$(CORE_SRC) -Iinclude
 INCLUDE             += `$(foreach d, `$(LIB_DIRS), -I`$d)
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Creation of Directories
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-DIRECTORIES         := `$(sort `$(dir `$(SRC_OBJ) `$(LIB_OBJ)))
-GENDIRECTORIES      := `$(foreach d, `$(DIRECTORIES), `$(shell if not exist `"`$d`" mkdir `"`$d`"))
+DIRECTORIES         :=  `$(sort `$(dir `$(CORE_OBJ) `$(SRC_OBJ) `$(LIB_OBJ)))
+generateDirs        := `$(foreach d, `$(DIRECTORIES), `$(shell if not exist `"`$d`" mkdir `"`$d`"))
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 # Targets
 #-------------------------------------------------------------------------------------------------------------------------------------------------
-.PHONY: all
-
-all: `$(TARGET_DATA_LIST_F) `$(OUTPUT_HEX)
+.PHONY: directories all rebuild clean cleanUser cleanCore
 
 
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-# Source Targets
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-`$(SRC_BIN)/%.o: `$(SRC)/%.c
-`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+all:  `$(TARGET_LST) `$(TARGET_HEX)
 
-`$(SRC_BIN)/%.o: `$(SRC)/%.cpp
-`t@`"`$(CXX)`" `$(CXX_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+rebuild: cleanUser all
 
-`$(SRC_BIN)/%.o: `$(SRC)/%.S
-`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+clean:   cleanUser cleanCore cleanLib
+`t@echo Cleaning done &&echo.
 
 
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-# Library Targets
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.c
-`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+`$(CORE_BIN)/%.o: `$(CORE_SRC)/%.S
+`t@echo CORE [ASM] `$(notdir `$<)
+`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -c `$<
 
-`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.cpp
-`t@`"`$(CXX)`" `$(CXX_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+`$(CORE_BIN)/%.o: `$(CORE_SRC)/%.c
+`t@echo CORE [CC]  `$(notdir `$<)
+`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -c `$<
+
+`$(CORE_BIN)/%.o: `$(CORE_SRC)/%.cpp
+`t@echo CORE [CPP] `$(notdir `$<)
+`t@`"`$(CXX)`" `$(CPP_FLAGS) `$(INCLUDE) -o `$@ -c `$<
+
+`$(CORE_LIB) : `$(CORE_OBJ)
+`t@echo CORE [AR]  `$@
+`t@`$(AR) `$(AR_FLAGS) `$@ `$^
+`t@echo Teensy core built successfully &&echo. 
 
 `$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.S
-`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -C `$<
+`t@echo LIB  [ASM] `$(notdir `$<)
+`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -c `$<
 
+`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.cpp
+`t@echo LIB  [CPP] `$(notdir `$<)
+`t@`"`$(CXX)`" `$(CPP_FLAGS) `$(INCLUDE) -o `$@ -c `$<
 
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-# Linking Targets
-#-------------------------------------------------------------------------------------------------------------------------------------------------
-`$(OUTPUT_ELF): `$(LIB_OBJ) `$(SRC_OBJ)
-`t@`$(CC) `$(LD_FLAGS) -o `"`$@`" `$(SRC_OBJ) `$(LIB_OBJ) `$(LIBS)
+`$(LIB_BIN)/%.o: `$(LIBS_DIR)/%.c
+`t@echo LIB  [CC]  `$(notdir `$<)
+`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `$@ -c `$<
+
+`$(SRC_BIN)/%.o: `$(SRC_SRC)/%.S
+`t@echo SRC  [ASM] `$<
+`t@`"`$(CC)`" `$(S_FLAGS) `$(INCLUDE) -o `$@ -c `$< 
+
+`$(SRC_BIN)/%.o: `$(SRC_SRC)/%.c
+`t@echo SRC  [CC]  `$(notdir `$<)
+`t@`"`$(CC)`" `$(C_FLAGS) `$(INCLUDE) -o `"`$@`" -c `$<
+
+`$(SRC_BIN)/%.o: `$(SRC_SRC)/%.cpp
+`t@echo SRC  [CPP] `$(notdir `$<)
+`t@`"`$(CXX)`" `$(CPP_FLAGS) `$(INCLUDE) -o `"`$@`" -c `$<
+
+`$(TARGET_ELF): `$(CORE_LIB) `$(LIB_OBJ) `$(SRC_OBJ)
+`t@echo [LD]  `$@
+`t@`$(CC) `$(LD_FLAGS) -o `"`$@`" `$(SRC_OBJ) `$(LIB_OBJ) `$(CORE_LIB)
+`t@echo Src code built and linked to libraries &&echo.
 
 %.lst: %.elf
-`t@`$(OBJDUMP) -d -S --demangle --no-show-raw-insn --syms `"`$<`" > `"`$@`"
+`t@echo [LST] `$@
+`t@`$(OBJDUMP) -d -S --demangle --no-show-raw-insn --syms `"`$<`"  > `"`$@`"	
+`t@echo Sucessfully built project &&echo.
 
 %.hex: %.elf
-`t@`$(OBJCOPY) -O ihex -R.eeprom `"`$<`" `"`$@`""
+`t@echo [HEX] `$@ 
+`t@`$(OBJCOPY) -O ihex -R.eeprom `"`$<`" `"`$@`"
+`t@echo Sucessfully build project HEX file&&echo.
+	
+	
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# Cleaning
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+cleanUser:
+`t@echo Cleaning user binaries...
+`t@if exist `$(SRC_BIN) rd /s/q `"`$(SRC_BIN)`"
+`t@if exist `"`$(TARGET_LST)`" del `$(subst /,\,`$(TARGET_LST))
+
+cleanCore:
+`t@echo Cleaning core binaries...
+`t@if exist `$(CORE_BIN) rd /s/q `"`$(CORE_BIN)`"
+`t@if exist `$(CORE_LIB) del  `$(subst /,\,`$(CORE_LIB))	
+
+cleanLib:
+`t@echo Cleaning user library binaries...
+`t@if exist `$(LIB_BIN) rd /s/q `"`$(LIB_BIN)`"
+
+
+
+-include `$(CORE_OBJ:.o=.d)
+-include `$(SRC_OBJ:.o=.d)
+-include `$(LIB_OBJ:.o=.d)
+"
 
 Write-Progress -Id 1 -Activity Updating -Status 'Creating Makefile' -PercentComplete 75 -CurrentOperation OuterLoop
 
